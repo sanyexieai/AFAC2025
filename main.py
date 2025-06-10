@@ -6,6 +6,9 @@ import logging
 from typing import Dict, Optional
 from agents.research.agent import ResearchAgent
 from agents.base import MessageType, AgentState
+from reports.generators.company import CompanyReportGenerator
+from reports.generators.industry import IndustryReportGenerator
+from reports.generators.macro import MacroReportGenerator
 
 # 配置日志
 logging.basicConfig(
@@ -69,6 +72,14 @@ def generate_report(report_type: str, target: str, timeframe: str = '1d', output
             
             logger.info("公司数据收集完成")
             
+            # 生成公司研报
+            generator = CompanyReportGenerator(output_dir)
+            report_data = {
+                "market_data": market_data,
+                "financial_data": financial_data,
+                "news_data": news_data
+            }
+            
         elif report_type == 'industry':
             # 收集行业数据
             market_data = research_agent.execute({
@@ -87,6 +98,13 @@ def generate_report(report_type: str, target: str, timeframe: str = '1d', output
             
             logger.info("行业数据收集完成")
             
+            # 生成行业研报
+            generator = IndustryReportGenerator(output_dir)
+            report_data = {
+                "market_data": market_data,
+                "news_data": news_data
+            }
+            
         elif report_type == 'macro':
             # 收集宏观数据
             news_data = research_agent.execute({
@@ -97,9 +115,16 @@ def generate_report(report_type: str, target: str, timeframe: str = '1d', output
             })
             
             logger.info("宏观数据收集完成")
+            
+            # 生成宏观研报
+            generator = MacroReportGenerator(output_dir)
+            report_data = {
+                "news_data": news_data
+            }
         
-        # TODO: 实现报告生成逻辑
-        logger.info(f"研报生成完成，输出目录：{output_dir}")
+        # 生成报告
+        report_path = generator.generate(report_data, target)
+        logger.info(f"研报生成完成，输出路径：{report_path}")
         
     except Exception as e:
         logger.error(f"研报生成失败：{str(e)}")
