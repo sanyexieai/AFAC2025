@@ -1,15 +1,25 @@
+import logging
 from typing import Any, Dict, List, Optional
 from ..base import BaseAgent, MessageType, AgentState
 from .collectors.market import MarketDataCollector
 from .collectors.financial import FinancialDataCollector
 from .collectors.news import NewsDataCollector
 from .validators.data_validator import DataValidator
+from utils.openai_client import OpenAIClient
 
 class ResearchAgent(BaseAgent):
-    """数据收集Agent，负责从各种数据源获取所需信息"""
+    """研究代理，负责收集数据"""
     
-    def __init__(self, name: str = "research_agent", config: Optional[Dict] = None):
+    def __init__(self, name: str = "ResearchAgent", config: Dict[str, Any] = None):
+        """初始化研究代理
+        
+        Args:
+            name: 代理名称
+            config: 配置信息
+        """
         super().__init__(name, config)
+        self.openai_client = OpenAIClient()
+        self.logger = logging.getLogger(__name__)
         self._setup_collectors()
         self._setup_validators()
         self._setup_message_handlers()
@@ -35,61 +45,194 @@ class ResearchAgent(BaseAgent):
             MessageType.ERROR: self._handle_error_message
         }
     
-    def execute(self, task: Dict) -> Dict:
-        """
-        执行数据收集任务
+    def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """执行数据收集任务
         
         Args:
-            task: 任务信息，包含以下字段：
-                - type: 数据类型 (market/financial/news)
-                - target: 目标对象 (股票代码/公司名称等)
+            task: 包含以下字段的字典：
+                - type: 报告类型（company/industry/macro）
+                - target: 目标（公司/行业/主题）
                 - timeframe: 时间范围
-                - fields: 需要收集的字段列表
-        
+                
         Returns:
-            收集到的数据
+            Dict[str, Any]: 收集到的数据
         """
-        self.update_state(AgentState.RUNNING)
         try:
+            self.logger.info(f"开始收集{task['type']}数据...")
+            
             # 验证任务
-            if not self._validate_impl(task):
-                raise ValueError("Invalid task format")
+            self._validate_task(task)
             
-            # 获取对应的采集器
-            collector = self.collectors.get(task["type"])
-            if not collector:
-                raise ValueError(f"Unsupported data type: {task['type']}")
+            # 根据报告类型收集数据
+            if task["type"] == "company":
+                data = self._collect_company_data(task)
+            elif task["type"] == "industry":
+                data = self._collect_industry_data(task)
+            else:  # macro
+                data = self._collect_macro_data(task)
             
-            # 收集数据
-            data = collector.collect(
-                target=task["target"],
-                timeframe=task.get("timeframe"),
-                fields=task.get("fields", [])
-            )
-            
-            # 验证数据
-            if not self.validator.validate(data):
-                raise ValueError("Data validation failed")
-            
-            self.update_state(AgentState.COMPLETED)
+            self.logger.info(f"{task['type']}数据收集完成")
             return data
             
         except Exception as e:
-            self.log_error(f"Data collection failed: {str(e)}")
+            self.logger.error(f"数据收集失败: {str(e)}")
             raise
     
-    def _validate_impl(self, data: Dict) -> bool:
-        """
-        验证任务格式
+    def _validate_task(self, task: Dict[str, Any]):
+        """验证任务格式"""
+        required_fields = ["type", "target", "timeframe"]
+        for field in required_fields:
+            if field not in task:
+                raise ValueError(f"缺少必要字段：{field}")
+        
+        if task["type"] not in ["company", "industry", "macro"]:
+            raise ValueError(f"不支持的报告类型：{task['type']}")
+    
+    def _collect_company_data(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """收集公司数据
         
         Args:
-            data: 待验证的任务数据
+            task: 任务信息
+            
+        Returns:
+            Dict[str, Any]: 公司数据
+        """
+        # 模拟数据
+        return {
+            "market_data": {
+                "code": task["target"],
+                "timeframe": task["timeframe"],
+                "open": 10.5,
+                "close": 11.2,
+                "high": 11.5,
+                "low": 10.3,
+                "volume": 1000000
+            },
+            "financial_data": {
+                "company": task["target"],
+                "period": task["timeframe"],
+                "revenue": 1000000000,
+                "profit": 100000000,
+                "assets": 5000000000,
+                "liabilities": 3000000000,
+                "equity": 2000000000
+            },
+            "news_data": [
+                {
+                    "target": task["target"],
+                    "timeframe": task["timeframe"],
+                    "title": "公司发布新产品",
+                    "content": "公司今日发布新产品，预计将带来显著收入增长。",
+                    "source": "财经网",
+                    "url": "http://example.com/news/1",
+                    "publish_time": "2023-01-15",
+                    "sentiment": "positive"
+                },
+                {
+                    "target": task["target"],
+                    "timeframe": task["timeframe"],
+                    "title": "公司获得重要订单",
+                    "content": "公司获得重要客户订单，合同金额达1亿元。",
+                    "source": "证券时报",
+                    "url": "http://example.com/news/2",
+                    "publish_time": "2023-02-01",
+                    "sentiment": "positive"
+                }
+            ]
+        }
+    
+    def _collect_industry_data(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """收集行业数据
+        
+        Args:
+            task: 任务信息
+            
+        Returns:
+            Dict[str, Any]: 行业数据
+        """
+        # 模拟数据
+        return {
+            "market_data": {
+                "industry": task["target"],
+                "timeframe": task["timeframe"],
+                "index": 1500,
+                "change": 2.5,
+                "volume": 5000000
+            },
+            "news_data": [
+                {
+                    "target": task["target"],
+                    "timeframe": task["timeframe"],
+                    "title": "行业政策利好",
+                    "content": "国家发布支持政策，促进行业发展。",
+                    "source": "经济日报",
+                    "url": "http://example.com/news/3",
+                    "publish_time": "2023-01-20",
+                    "sentiment": "positive"
+                },
+                {
+                    "target": task["target"],
+                    "timeframe": task["timeframe"],
+                    "title": "行业技术创新",
+                    "content": "行业龙头企业发布新技术，引领发展方向。",
+                    "source": "科技日报",
+                    "url": "http://example.com/news/4",
+                    "publish_time": "2023-02-10",
+                    "sentiment": "positive"
+                }
+            ]
+        }
+    
+    def _collect_macro_data(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """收集宏观数据
+        
+        Args:
+            task: 任务信息
+            
+        Returns:
+            Dict[str, Any]: 宏观数据
+        """
+        # 模拟数据
+        return {
+            "news_data": [
+                {
+                    "target": task["target"],
+                    "timeframe": task["timeframe"],
+                    "title": "宏观经济数据发布",
+                    "content": "GDP增长6.5%，超出市场预期。",
+                    "source": "国家统计局",
+                    "url": "http://example.com/news/5",
+                    "publish_time": "2023-01-25",
+                    "sentiment": "positive"
+                },
+                {
+                    "target": task["target"],
+                    "timeframe": task["timeframe"],
+                    "title": "货币政策调整",
+                    "content": "央行宣布降准0.5个百分点，释放长期资金。",
+                    "source": "央行网站",
+                    "url": "http://example.com/news/6",
+                    "publish_time": "2023-02-15",
+                    "sentiment": "positive"
+                }
+            ]
+        }
+    
+    def _validate_impl(self, data: Dict[str, Any]) -> bool:
+        """
+        实现基类的抽象方法，验证数据格式
+        
+        Args:
+            data: 要验证的数据
             
         Returns:
             验证是否通过
         """
-        required_fields = ["type", "target"]
-        return all(field in data for field in required_fields)
+        try:
+            self._validate_task(data)
+            return True
+        except ValueError:
+            return False
     
     def _handle_task_message(self, message: Any) -> None:
         """处理任务消息"""
@@ -188,6 +331,8 @@ class ResearchAgent(BaseAgent):
     
     def cleanup(self) -> None:
         """清理资源"""
+        self.logger.info("清理研究代理资源")
+        self.state = AgentState.IDLE
         for collector in self.collectors.values():
             collector.cleanup()
         super().cleanup()
