@@ -134,17 +134,17 @@ cp .env.example .env
 ### 使用方法
 1. 生成公司研报
 ```bash
-python main.py --type company --target "00020.HK"
+python main.py --type company --target "00020.HK" --timeframe "2023Q1"
 ```
 
 2. 生成行业研报
 ```bash
-python main.py --type industry --target "智能风控&大数据征信服务"
+python main.py --type industry --target "互联网" --timeframe "2023H1"
 ```
 
 3. 生成宏观研报
 ```bash
-python main.py --type macro --target "生成式AI基建与算力投资趋势"
+python main.py --type macro --target "经济政策" --timeframe "2023Y"
 ```
 
 ## 开发指南

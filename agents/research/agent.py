@@ -97,48 +97,31 @@ class ResearchAgent(BaseAgent):
         Returns:
             Dict[str, Any]: 公司数据
         """
-        # 模拟数据
+        # 收集市场数据
+        market_data = self.market_collector.collect(
+            target=task["target"],
+            timeframe=task["timeframe"],
+            fields=["open", "close", "high", "low", "volume"]
+        )
+        
+        # 收集财务数据
+        financial_data = self.financial_collector.collect(
+            target=task["target"],
+            timeframe=task["timeframe"],
+            fields=["revenue", "profit", "assets", "liabilities", "equity"]
+        )
+        
+        # 收集新闻数据
+        news_data = self.news_collector.collect(
+            target=task["target"],
+            timeframe=task["timeframe"],
+            fields=["title", "content", "source", "publish_time", "sentiment"]
+        )
+        
         return {
-            "market_data": {
-                "code": task["target"],
-                "timeframe": task["timeframe"],
-                "open": 10.5,
-                "close": 11.2,
-                "high": 11.5,
-                "low": 10.3,
-                "volume": 1000000
-            },
-            "financial_data": {
-                "company": task["target"],
-                "period": task["timeframe"],
-                "revenue": 1000000000,
-                "profit": 100000000,
-                "assets": 5000000000,
-                "liabilities": 3000000000,
-                "equity": 2000000000
-            },
-            "news_data": [
-                {
-                    "target": task["target"],
-                    "timeframe": task["timeframe"],
-                    "title": "公司发布新产品",
-                    "content": "公司今日发布新产品，预计将带来显著收入增长。",
-                    "source": "财经网",
-                    "url": "http://example.com/news/1",
-                    "publish_time": "2023-01-15",
-                    "sentiment": "positive"
-                },
-                {
-                    "target": task["target"],
-                    "timeframe": task["timeframe"],
-                    "title": "公司获得重要订单",
-                    "content": "公司获得重要客户订单，合同金额达1亿元。",
-                    "source": "证券时报",
-                    "url": "http://example.com/news/2",
-                    "publish_time": "2023-02-01",
-                    "sentiment": "positive"
-                }
-            ]
+            "market_data": market_data,
+            "financial_data": financial_data,
+            "news_data": news_data
         }
     
     def _collect_industry_data(self, task: Dict[str, Any]) -> Dict[str, Any]:
@@ -150,37 +133,23 @@ class ResearchAgent(BaseAgent):
         Returns:
             Dict[str, Any]: 行业数据
         """
-        # 模拟数据
+        # 收集市场数据
+        market_data = self.market_collector.collect(
+            target=task["target"],
+            timeframe=task["timeframe"],
+            fields=["index", "change", "volume"]
+        )
+        
+        # 收集新闻数据
+        news_data = self.news_collector.collect(
+            target=task["target"],
+            timeframe=task["timeframe"],
+            fields=["title", "content", "source", "publish_time", "sentiment"]
+        )
+        
         return {
-            "market_data": {
-                "industry": task["target"],
-                "timeframe": task["timeframe"],
-                "index": 1500,
-                "change": 2.5,
-                "volume": 5000000
-            },
-            "news_data": [
-                {
-                    "target": task["target"],
-                    "timeframe": task["timeframe"],
-                    "title": "行业政策利好",
-                    "content": "国家发布支持政策，促进行业发展。",
-                    "source": "经济日报",
-                    "url": "http://example.com/news/3",
-                    "publish_time": "2023-01-20",
-                    "sentiment": "positive"
-                },
-                {
-                    "target": task["target"],
-                    "timeframe": task["timeframe"],
-                    "title": "行业技术创新",
-                    "content": "行业龙头企业发布新技术，引领发展方向。",
-                    "source": "科技日报",
-                    "url": "http://example.com/news/4",
-                    "publish_time": "2023-02-10",
-                    "sentiment": "positive"
-                }
-            ]
+            "market_data": market_data,
+            "news_data": news_data
         }
     
     def _collect_macro_data(self, task: Dict[str, Any]) -> Dict[str, Any]:
@@ -192,30 +161,15 @@ class ResearchAgent(BaseAgent):
         Returns:
             Dict[str, Any]: 宏观数据
         """
-        # 模拟数据
+        # 收集新闻数据
+        news_data = self.news_collector.collect(
+            target=task["target"],
+            timeframe=task["timeframe"],
+            fields=["title", "content", "source", "publish_time", "sentiment"]
+        )
+        
         return {
-            "news_data": [
-                {
-                    "target": task["target"],
-                    "timeframe": task["timeframe"],
-                    "title": "宏观经济数据发布",
-                    "content": "GDP增长6.5%，超出市场预期。",
-                    "source": "国家统计局",
-                    "url": "http://example.com/news/5",
-                    "publish_time": "2023-01-25",
-                    "sentiment": "positive"
-                },
-                {
-                    "target": task["target"],
-                    "timeframe": task["timeframe"],
-                    "title": "货币政策调整",
-                    "content": "央行宣布降准0.5个百分点，释放长期资金。",
-                    "source": "央行网站",
-                    "url": "http://example.com/news/6",
-                    "publish_time": "2023-02-15",
-                    "sentiment": "positive"
-                }
-            ]
+            "news_data": news_data
         }
     
     def _validate_impl(self, data: Dict[str, Any]) -> bool:

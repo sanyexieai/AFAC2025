@@ -1,0 +1,19 @@
+market:
+  cache_ttl: 3600  # 缓存时间1小时
+  sources:
+    wind:
+      api_key: "your_wind_api_key"
+      priority: 1
+    tushare:
+      token: "your_tushare_token"
+      priority: 2
+
+news:
+  cache_ttl: 1800  # 缓存时间30分钟
+  sources:
+    sina_news:
+      api_key: "your_sina_api_key"
+      priority: 1
+    eastmoney_news:
+      api_key: "your_eastmoney_api_key"
+      priority: 2 
