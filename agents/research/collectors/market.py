@@ -1,5 +1,13 @@
 from typing import Dict, List, Optional, Any
 from .base import BaseCollector, DataSource
+import asyncio
+import json
+import logging
+from .mcp.market_tools import (
+    fetch_wind_data,
+    fetch_tushare_data,
+    validate_market_data
+)
 
 class WindDataSource(DataSource):
     """Wind数据源"""
@@ -7,29 +15,46 @@ class WindDataSource(DataSource):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.api_key = config.get('api_key')
-        self.connected = False
+        self.connected = True
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.info(f"Initializing WindDataSource with config: {config}")
     
     def get_name(self) -> str:
         return "wind"
     
     def is_available(self) -> bool:
-        # TODO: 实现实际的连接检查
-        return self.connected
+        available = self.connected
+        self.logger.info(f"WindDataSource availability check: {available}")
+        return available
     
     def get_data(self, target: str, timeframe: str, fields: List[str]) -> Dict:
-        # TODO: 实现实际的Wind API调用
-        # 模拟数据
-        return {
-            "code": target,
-            "timeframe": timeframe,
-            "data": {
-                "open": 100.0,
-                "close": 101.0,
-                "high": 102.0,
-                "low": 99.0,
-                "volume": 1000000
-            }
-        }
+        self.logger.info(f"Fetching data from Wind for target={target}, timeframe={timeframe}, fields={fields}")
+        # 创建事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # 获取数据
+            self.logger.info("Calling fetch_wind_data")
+            raw_data = loop.run_until_complete(fetch_wind_data(target, timeframe, fields))
+            self.logger.info("Successfully got raw data from fetch_wind_data")
+            data = json.loads(raw_data)
+            
+            # 验证数据
+            self.logger.info("Validating market data")
+            validation_result = loop.run_until_complete(validate_market_data(json.dumps(data)))
+            validation_data = json.loads(validation_result)
+            if not validation_data["valid"]:
+                self.logger.error(f"Market data validation failed: {validation_data}")
+                raise ValueError("Market data validation failed")
+            
+            self.logger.info("Data validation successful")
+            return data
+        except Exception as e:
+            self.logger.error(f"Error in get_data: {str(e)}", exc_info=True)
+            raise
+        finally:
+            loop.close()
     
     def get_metadata(self) -> Dict:
         return {
@@ -44,29 +69,46 @@ class TushareDataSource(DataSource):
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.token = config.get('token')
-        self.connected = False
+        self.connected = True  # 改为默认可用
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.info(f"Initializing TushareDataSource with config: {config}")
     
     def get_name(self) -> str:
         return "tushare"
     
     def is_available(self) -> bool:
-        # TODO: 实现实际的连接检查
-        return self.connected
+        available = self.connected
+        self.logger.info(f"TushareDataSource availability check: {available}")
+        return available
     
     def get_data(self, target: str, timeframe: str, fields: List[str]) -> Dict:
-        # TODO: 实现实际的Tushare API调用
-        # 模拟数据
-        return {
-            "code": target,
-            "timeframe": timeframe,
-            "data": {
-                "open": 100.0,
-                "close": 101.0,
-                "high": 102.0,
-                "low": 99.0,
-                "volume": 1000000
-            }
-        }
+        self.logger.info(f"Fetching data from Tushare for target={target}, timeframe={timeframe}, fields={fields}")
+        # 创建事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # 获取数据
+            self.logger.info("Calling fetch_tushare_data")
+            raw_data = loop.run_until_complete(fetch_tushare_data(target, timeframe, fields))
+            self.logger.info("Successfully got raw data from fetch_tushare_data")
+            data = json.loads(raw_data)
+            
+            # 验证数据
+            self.logger.info("Validating market data")
+            validation_result = loop.run_until_complete(validate_market_data(json.dumps(data)))
+            validation_data = json.loads(validation_result)
+            if not validation_data["valid"]:
+                self.logger.error(f"Market data validation failed: {validation_data}")
+                raise ValueError("Market data validation failed")
+            
+            self.logger.info("Data validation successful")
+            return data
+        except Exception as e:
+            self.logger.error(f"Error in get_data: {str(e)}", exc_info=True)
+            raise
+        finally:
+            loop.close()
     
     def get_metadata(self) -> Dict:
         return {
@@ -78,31 +120,65 @@ class TushareDataSource(DataSource):
 class MarketDataCollector(BaseCollector):
     """市场数据采集器"""
     
+    def __init__(self, config: Dict[str, Any] = None):
+        """初始化市场数据采集器
+        
+        Args:
+            config: 配置信息，如果为None或为空则使用默认配置
+        """
+        # 初始化 logger
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
+        # 如果配置为空或None，使用默认配置
+        if not config:
+            config = {
+                'sources': {
+                    'wind': {'api_key': 'default'},
+                    'tushare': {'token': 'default'}
+                }
+            }
+            self.logger.info("Using default configuration")
+        
+        self.logger.info(f"Initializing MarketDataCollector with config: {config}")
+        super().__init__(config)
+    
     def _setup_sources(self) -> None:
         """初始化数据源"""
         # 从配置中加载数据源
         sources_config = self.config.get('sources', {})
+        self.logger.info(f"Setting up market sources with config: {sources_config}")
         
         # 添加Wind数据源
         if 'wind' in sources_config:
+            self.logger.info("Initializing Wind source")
             wind_source = WindDataSource(sources_config['wind'])
             self.register_source(wind_source)
+            self.logger.info(f"Wind source initialized and registered. Available: {wind_source.is_available()}")
         
         # 添加Tushare数据源
         if 'tushare' in sources_config:
+            self.logger.info("Initializing Tushare source")
             tushare_source = TushareDataSource(sources_config['tushare'])
             self.register_source(tushare_source)
+            self.logger.info(f"Tushare source initialized and registered. Available: {tushare_source.is_available()}")
+        
+        self.logger.info(f"Total registered sources: {len(self.sources)}")
+        for name, source in self.sources.items():
+            self.logger.info(f"Source {name} available: {source.is_available()}")
     
     def validate(self, data: Dict) -> bool:
         """验证数据格式"""
-        required_fields = ['code', 'timeframe', 'data']
-        if not all(field in data for field in required_fields):
-            return False
+        # 创建事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        market_data = data['data']
-        required_market_fields = ['open', 'close', 'high', 'low', 'volume']
-        return all(field in market_data for field in required_market_fields)
-
+        try:
+            # 验证数据
+            validation_result = loop.run_until_complete(validate_market_data(json.dumps(data)))
+            return json.loads(validation_result)["valid"]
+        finally:
+            loop.close()
+    
     def collect(self, target: str, timeframe: Optional[str] = None, fields: Optional[List[str]] = None) -> Dict:
         """
         收集市场数据
@@ -115,51 +191,26 @@ class MarketDataCollector(BaseCollector):
         Returns:
             市场数据
         """
-        self.logger.info(f"Collecting market data for {target}")
+        self.logger.info(f"Collecting market data for {target} with timeframe={timeframe}, fields={fields}")
         
-        # TODO: 实现实际的数据采集逻辑
-        # 这里应该调用实际的数据源API，如Wind、Tushare等
+        # 使用第一个可用的数据源
+        for source_name, source in self.sources.items():
+            self.logger.info(f"Trying source: {source_name}")
+            if source.is_available():
+                self.logger.info(f"Source {source_name} is available, attempting to get data")
+                try:
+                    data = source.get_data(target, timeframe or "1d", fields or ["open", "close", "high", "low", "volume"])
+                    self.logger.info(f"Successfully got data from {source_name}")
+                    if self.validate(data):
+                        self.logger.info(f"Data from {source_name} passed validation")
+                        return data
+                    else:
+                        self.logger.warning(f"Data from {source_name} failed validation")
+                except Exception as e:
+                    self.logger.error(f"Error collecting data from {source_name}: {str(e)}", exc_info=True)
+                    continue
+            else:
+                self.logger.warning(f"Source {source_name} is not available")
         
-        # 模拟数据
-        data = {
-            "code": target,
-            "timeframe": timeframe or "1d",
-            "data": {
-                "open": 100.0,
-                "close": 101.0,
-                "high": 102.0,
-                "low": 99.0,
-                "volume": 1000000
-            }
-        }
-        
-        if not self.validate(data):
-            raise ValueError("Market data validation failed")
-        
-        return data
-    
-    def _validate_impl(self, data: Dict) -> bool:
-        """
-        验证市场数据
-        
-        Args:
-            data: 待验证的市场数据
-            
-        Returns:
-            验证是否通过
-        """
-        # 检查必要字段
-        if not all(key in data for key in ["code", "timeframe", "data"]):
-            return False
-        
-        # 检查数据字段
-        required_fields = ["open", "close", "high", "low", "volume"]
-        if not all(field in data["data"] for field in required_fields):
-            return False
-        
-        # 检查数据类型
-        for field in required_fields:
-            if not isinstance(data["data"][field], (int, float)):
-                return False
-        
-        return True 
+        self.logger.error("No available data source found after trying all sources")
+        raise ValueError("No available data source") 
