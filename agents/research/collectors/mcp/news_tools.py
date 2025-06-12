@@ -1,35 +1,14 @@
 from typing import Dict, List, Any
 from datetime import datetime
 import json
-import logging
-import sys
 from mcp.server.fastmcp import FastMCP
-
-# 配置日志
-def setup_logger():
-    # 创建控制台处理器
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    
-    # 设置日志格式
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    
-    # 获取根日志记录器
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    
-    # 清除现有的处理器
-    root_logger.handlers = []
-    
-    # 添加控制台处理器
-    root_logger.addHandler(console_handler)
+from .utils import setup_logger, get_logger, tavily_search
 
 # 初始化日志配置
 setup_logger()
 
 # 初始化日志记录器
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 初始化 MCP 服务器
 mcp = FastMCP("news_service")
@@ -48,23 +27,30 @@ async def fetch_sina_news(target: str, timeframe: str, fields: List[str]) -> str
     """
     logger.info(f"Fetching Sina news for target={target}, timeframe={timeframe}, fields={fields}")
     try:
-        # TODO: 实现实际的新浪新闻API调用
-        # 模拟数据
+        # 构建搜索查询
+        query = f"site:sina.com.cn {target} {timeframe} 新闻"
+        results = tavily_search.invoke(query)
+        
+        # 格式化结果
+        news_list = []
+        for result in results:
+            news = {
+                "title": result.get("title", ""),
+                "content": result.get("content", ""),
+                "source": "新浪财经",
+                "url": result.get("url", ""),
+                "publish_time": datetime.now().isoformat(),  # 注意：实际应用中应该从内容中提取时间
+                "sentiment": 0.8  # 注意：实际应用中应该使用情感分析
+            }
+            news_list.append(news)
+        
         data = {
             "target": target,
             "timeframe": timeframe,
-            "news": [
-                {
-                    "title": "公司发布新产品",
-                    "content": "公司今日发布新产品，预计将带来显著收入增长...",
-                    "source": "新浪财经",
-                    "url": "http://example.com/news/1",
-                    "publish_time": datetime.now().isoformat(),
-                    "sentiment": 0.8
-                }
-            ]
+            "news": news_list
         }
-        logger.info("Successfully generated mock data for Sina news")
+        
+        logger.info(f"Successfully retrieved {len(news_list)} news items from Sina")
         return json.dumps(data, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error fetching Sina news: {str(e)}", exc_info=True)
@@ -84,23 +70,30 @@ async def fetch_eastmoney_news(target: str, timeframe: str, fields: List[str]) -
     """
     logger.info(f"Fetching EastMoney news for target={target}, timeframe={timeframe}, fields={fields}")
     try:
-        # TODO: 实现实际的东方财富新闻API调用
-        # 模拟数据
+        # 构建搜索查询
+        query = f"site:eastmoney.com {target} {timeframe} 新闻"
+        results = tavily_search.invoke(query)
+        
+        # 格式化结果
+        news_list = []
+        for result in results:
+            news = {
+                "title": result.get("title", ""),
+                "content": result.get("content", ""),
+                "source": "东方财富",
+                "url": result.get("url", ""),
+                "publish_time": datetime.now().isoformat(),  # 注意：实际应用中应该从内容中提取时间
+                "sentiment": 0.9  # 注意：实际应用中应该使用情感分析
+            }
+            news_list.append(news)
+        
         data = {
             "target": target,
             "timeframe": timeframe,
-            "news": [
-                {
-                    "title": "公司获得重要订单",
-                    "content": "公司获得重要客户订单，合同金额达1亿元...",
-                    "source": "东方财富",
-                    "url": "http://example.com/news/3",
-                    "publish_time": datetime.now().isoformat(),
-                    "sentiment": 0.9
-                }
-            ]
+            "news": news_list
         }
-        logger.info("Successfully generated mock data for EastMoney news")
+        
+        logger.info(f"Successfully retrieved {len(news_list)} news items from EastMoney")
         return json.dumps(data, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error fetching EastMoney news: {str(e)}", exc_info=True)
@@ -117,18 +110,24 @@ async def filter_news(news_data: str, filters: Dict[str, Any]) -> str:
     Returns:
         str: 过滤后的新闻数据
     """
-    data = json.loads(news_data)
-    if not filters:
-        return news_data
-    
-    filtered_news = []
-    for news in data["news"]:
-        if all(_apply_filter(news, key, value) 
-              for key, value in filters.items()):
-            filtered_news.append(news)
-    
-    data["news"] = filtered_news
-    return json.dumps(data, ensure_ascii=False, indent=2)
+    logger.info(f"Filtering news data with filters: {filters}")
+    try:
+        data = json.loads(news_data)
+        if not filters:
+            return news_data
+        
+        filtered_news = []
+        for news in data["news"]:
+            if all(_apply_filter(news, key, value) 
+                  for key, value in filters.items()):
+                filtered_news.append(news)
+        
+        data["news"] = filtered_news
+        logger.info(f"Filtered to {len(filtered_news)} news items")
+        return json.dumps(data, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error filtering news data: {str(e)}", exc_info=True)
+        raise
 
 @mcp.tool()
 async def aggregate_news(news_data: str, aggregation: Dict[str, str]) -> str:
@@ -141,21 +140,27 @@ async def aggregate_news(news_data: str, aggregation: Dict[str, str]) -> str:
     Returns:
         str: 聚合后的新闻数据
     """
-    data = json.loads(news_data)
-    if not aggregation:
-        return news_data
-    
-    result = {}
-    for field, rule in aggregation.items():
-        if rule == "count":
-            result[f"{field}_count"] = len(data["news"])
-        elif rule == "average":
-            values = [news[field] for news in data["news"] if field in news]
-            if values:
-                result[f"{field}_avg"] = sum(values) / len(values)
-    
-    result["news"] = data["news"]
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    logger.info(f"Aggregating news data with rules: {aggregation}")
+    try:
+        data = json.loads(news_data)
+        if not aggregation:
+            return news_data
+        
+        result = {}
+        for field, rule in aggregation.items():
+            if rule == "count":
+                result[f"{field}_count"] = len(data["news"])
+            elif rule == "average":
+                values = [news[field] for news in data["news"] if field in news]
+                if values:
+                    result[f"{field}_avg"] = sum(values) / len(values)
+        
+        result["news"] = data["news"]
+        logger.info("Successfully aggregated news data")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error aggregating news data: {str(e)}", exc_info=True)
+        raise
 
 @mcp.tool()
 async def enrich_news(news_data: str) -> str:
@@ -167,18 +172,25 @@ async def enrich_news(news_data: str) -> str:
     Returns:
         str: 丰富后的新闻数据
     """
-    data = json.loads(news_data)
-    for news in data["news"]:
-        # 添加时间戳
-        if "publish_time" in news:
-            news["timestamp"] = datetime.fromisoformat(news["publish_time"]).timestamp()
-        # 添加来源信息
-        if "source" in news:
-            news["source_info"] = {
-                "name": news["source"],
-                "reliability": _get_source_reliability(news["source"])
-            }
-    return json.dumps(data, ensure_ascii=False, indent=2)
+    logger.info("Enriching news data")
+    try:
+        data = json.loads(news_data)
+        for news in data["news"]:
+            # 添加时间戳
+            if "publish_time" in news:
+                news["timestamp"] = datetime.fromisoformat(news["publish_time"]).timestamp()
+            # 添加来源信息
+            if "source" in news:
+                news["source_info"] = {
+                    "name": news["source"],
+                    "reliability": _get_source_reliability(news["source"])
+                }
+        
+        logger.info("Successfully enriched news data")
+        return json.dumps(data, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error enriching news data: {str(e)}", exc_info=True)
+        raise
 
 @mcp.tool()
 async def validate_news(news_data: str) -> str:

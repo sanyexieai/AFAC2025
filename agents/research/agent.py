@@ -1,9 +1,9 @@
 import logging
 from typing import Any, Dict, List, Optional
 from ..base import BaseAgent, MessageType, AgentState
-from .collectors.market import MarketDataCollector
-from .collectors.financial import FinancialDataCollector
-from .collectors.news import NewsDataCollector
+from .collectors.langchain.market import LangChainMarketCollector
+from .collectors.langchain.financial import LangChainFinancialCollector
+from .collectors.langchain.news import LangChainNewsCollector
 from .validators.data_validator import DataValidator
 from utils.openai_client import OpenAIClient
 
@@ -26,10 +26,23 @@ class ResearchAgent(BaseAgent):
     
     def _setup_collectors(self) -> None:
         """初始化数据采集器"""
+        # 获取 LLM 配置
+        llm_config = {
+            "llm": self.openai_client.client,
+            "max_results": self.config.get("max_results", 5)
+        }
+        
+        # 初始化采集器
         self.collectors = {
-            "market": MarketDataCollector(self.config.get("market", {})),
-            "financial": FinancialDataCollector(self.config.get("financial", {})),
-            "news": NewsDataCollector(self.config.get("news", {}))
+            "market": LangChainMarketCollector({
+                **llm_config,
+                "api_key": self.config.get("market", {}).get("api_key", "")
+            }),
+            "financial": LangChainFinancialCollector({
+                **llm_config,
+                "api_key": self.config.get("financial", {}).get("api_key", "")
+            }),
+            "news": LangChainNewsCollector(llm_config)
         }
     
     def _setup_validators(self) -> None:
@@ -290,15 +303,15 @@ class ResearchAgent(BaseAgent):
         for collector in self.collectors.values():
             collector.cleanup()
         super().cleanup()
-
+    
     @property
     def market_collector(self):
         return self.collectors["market"]
-
+    
     @property
     def financial_collector(self):
         return self.collectors["financial"]
-
+    
     @property
     def news_collector(self):
         return self.collectors["news"] 
