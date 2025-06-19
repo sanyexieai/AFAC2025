@@ -17,7 +17,7 @@ def parse_args():
                       help="报告类型：company（公司）、industry（行业）、macro（宏观）")
     parser.add_argument("--target", required=True,
                       help="目标：公司代码、行业名称或宏观主题")
-    parser.add_argument("--timeframe", required=True,
+    parser.add_argument("--timeframe", required=False,
                       help="时间范围：如 2023Q1、2023H1、2023Y")
     parser.add_argument("--output", default="reports",
                       help="输出目录，默认为 reports")

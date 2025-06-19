@@ -136,7 +136,8 @@ class LangChainMarketCollector(LangChainCollector):
         
         # 使用 Agent 执行数据采集
         result = self.agent_executor.invoke({
-            "input": f"搜索 {target} 的{timeframe or '最新'}市场数据和相关新闻"
+            "input": f"搜索 {target} 的{timeframe or '最新'}市场数据和相关新闻",
+            "chat_history": []  # 添加空的聊天历史
         })
         
         # 解析结果

@@ -9,6 +9,7 @@ from langchain.schema import SystemMessage
 from langchain.agents.format_scratchpad import format_to_openai_function_messages
 from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain.chat_models import ChatOpenAI
+import os
 
 class LangChainCollector(ABC):
     """基于 LangChain 的数据采集器基类"""
@@ -36,11 +37,21 @@ class LangChainCollector(ABC):
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
         
-        # 创建 ChatOpenAI 实例
-        llm = ChatOpenAI(
-            model_name=self.config.get("model_name", "gpt-3.5-turbo"),
-            temperature=self.config.get("temperature", 0.7),
-            api_key=self.config.get("api_key")
+        # 确保使用 ChatOpenAI
+        if isinstance(self.config.get("llm"), ChatOpenAI):
+            llm = self.config["llm"]
+        else:
+            llm = ChatOpenAI(
+                model_name=os.getenv("OPENAI_API_MODEL", "deepseek-chat"),
+                temperature=self.config.get("temperature", 0.7),
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url=os.getenv("OPENAI_API_BASE")
+            )
+        
+        # 创建 memory
+        memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
         )
         
         # 创建 Agent
@@ -52,7 +63,7 @@ class LangChainCollector(ABC):
             handle_parsing_errors=True,
             max_iterations=3,
             early_stopping_method="generate",
-            memory=None
+            memory=memory
         )
     
     @abstractmethod
